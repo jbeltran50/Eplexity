@@ -36,30 +36,30 @@ Parameters:
   VPCCIDR: # VPC CIDR
     Type: "String"
     Description: "Please enter IP range (CIDR notation) for this VPC"
-    Default: "10.192.0.0/16"
+    Default: "172.30.0.0/16"
     MinLength: 9
     MaxLength: 18
     AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
   PublicSubnet01CIDR: # 4 Subnets
     Type: "String"
     Description: "Please enter IP range (CIDR notation) for the 1st public subnet"
-    Default: 10.192.10.0/24
+    Default: 172.30.10.0/24
   PublicSubnet02CIDR:
     Type: "String"
     Description: "Please enter IP range (CIDR notation) for the 2nd public subnet"
-    Default: 10.192.11.0/24
+    Default: 172.30.11.0/24
   PrivateSubnet01CIDR:
     Type: "String"
     Description: "Please enter IP range (CIDR notation) for the 1st private subnet"
-    Default: 10.192.20.0/24
+    Default: 172.30.20.0/24
   PrivateSubnet02CIDR:
     Type: "String"
     Description: "Please enter IP range (CIDR notation) for the 2nd private subnet"
-    Default: 10.192.21.0/24
+    Default: 172.30.21.0/24
   EnvironmentName: # Environment
     Type: "String"
     Description: "Enter the environment name for this VPC"
-    Default: "DEV"
+    Default: "PROD"
 ############
 # Resources
 ############

@@ -2,7 +2,7 @@
 
 #### IF an existing EC2 instance resides in a public subnet (On or Off) ####
 # "botocore.exceptions.ClientError: An error occurred (DependencyViolation) when calling the DeleteSubnet operation: 
-# The subnet 'subnet-0aa68b21641fea06f' has dependencies and cannot be deleted."
+# The subnet 'subnet-123456789012' has dependencies and cannot be deleted."
 #### ↑↑↑ Basically this won't impact running instances ↑↑↑ ####
 
 # If for any reason you need to recreate your default VPC it can be done in the CLI using
@@ -15,7 +15,6 @@ import argparse
 import urllib3
 
 session = None
-
 
 class initArgs(object):
 
