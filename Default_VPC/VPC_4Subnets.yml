@@ -1,0 +1,248 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  VPC infrastructure template that will have 2 public subnets and 2 private subnets
+  spread across 2 AZs.
+  Created Resources:
+    VPC - Customize CIDR at creation.
+    PublicSubnets - Customize CIDR at creation. Routed through public route using IGW
+    PrivateSubnets - Customize CIDR at creation. Routed through private route using NAT Gateways
+    InternetGateway - Attached to VPC.
+    2 NAT Gateways and 2 EIPs - 1 per AZ for PrivateSubnets.    
+############
+# Metadata
+############
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups: # This groups the 'Parameters' in a desired order for the stack creation in the console.
+      - Label: # Parameter section
+          default: 'Environment Name' # Label
+        Parameters: # Parameters under the "Environtment Name" Label
+          - EnvironmentName # Directly calls EnvironmentName Parameter
+      - Label: # Additional Parameter section
+          default: 'VPC CIDR and 2 public and 2 private subnets'
+        Parameters:
+          - VPCCIDR
+          - PublicSubnet01CIDR
+          - PublicSubnet02CIDR
+          - PrivateSubnet01CIDR
+          - PrivateSubnet02CIDR
+    ParameterLabels: # This creates a label instead of logical resource ID.
+      VPCCIDR:       # More user friendly presentation in CF interface
+        default: "VPC CIDR of new VPC." # Uses Parameter Label instead of VPCCIDR
+############
+# Parameters
+############
+Parameters:
+  VPCCIDR: # VPC CIDR
+    Type: "String"
+    Description: "Please enter IP range (CIDR notation) for this VPC"
+    Default: "10.192.0.0/16"
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  PublicSubnet01CIDR: # 4 Subnets
+    Type: "String"
+    Description: "Please enter IP range (CIDR notation) for the 1st public subnet"
+    Default: 10.192.10.0/24
+  PublicSubnet02CIDR:
+    Type: "String"
+    Description: "Please enter IP range (CIDR notation) for the 2nd public subnet"
+    Default: 10.192.11.0/24
+  PrivateSubnet01CIDR:
+    Type: "String"
+    Description: "Please enter IP range (CIDR notation) for the 1st private subnet"
+    Default: 10.192.20.0/24
+  PrivateSubnet02CIDR:
+    Type: "String"
+    Description: "Please enter IP range (CIDR notation) for the 2nd private subnet"
+    Default: 10.192.21.0/24
+  EnvironmentName: # Environment
+    Type: "String"
+    Description: "Enter the environment name for this VPC"
+    Default: "DEV"
+############
+# Resources
+############
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: 'true' # Boolean value; by default the value is set to true.
+      EnableDnsHostnames: 'true' # Boolean value; by default the value is set to false. If 'true' -> EnableDnsHostnames must be true
+      # InstanceTenancy: "default" # Options: default or dedicated
+      Tags:
+        - Key: "Name"
+          Value: !Join [ "-", [!Ref EnvironmentName, VPC]]
+  PublicSubnet01: # 1st PublicSubnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet01CIDR
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+      VpcId: !Ref VPC
+      # AssignIpv6AddressOnCreation: Boolean
+      # Ipv6CidrBlock: String
+  PublicSubnet02: # 2nd PublicSubnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet02CIDR
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+      VpcId: !Ref VPC
+  PrivateSubnet01: # 1st PrivateSubnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet01CIDR
+      # MapPublicIpOnLaunch: 'false' (default)
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+      VpcId: !Ref VPC
+  PrivateSubnet02: # 2nd PrivateSubnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet02CIDR
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+      VpcId: !Ref VPC
+  InternetGateway: # InternetGateway (Creation & Attachment)
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: !Ref EnvironmentName
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+      # VpnGatewayId: String # Attaching IGW, similar process for VPN Gateway though
+  NatGateway01EIP: # 2 NatGateways for PrivateSubnets and 2 NatGateway associated EIPs (Public, Static, IP addresses)
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      # InstanceId: String (Instance ID of the Amazon EC2 instance that you want to associate)
+      Domain: "vpc"
+  NatGateway02EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: "vpc"
+  NatGateway01:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway01EIP.AllocationId
+      SubnetId: !Ref PublicSubnet01
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${EnvironmentName}01
+  NatGateway02:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway02EIP.AllocationId
+      SubnetId: !Ref PublicSubnet02
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${EnvironmentName}02
+  PublicRouteTable: # Public: RouteTables, Route, and Subnet associations
+    Type: AWS::EC2::RouteTable
+    Properties:
+        VpcId: !Ref VPC
+        Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Public Routes
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      # DestinationIpv6CidrBlock: String
+      # Required: Conditional. You must specify only one of the following properties: EgressOnlyInternetGatewayId, GatewayId, InstanceId, NatGatewayId, NetworkInterfaceId, or VpcPeeringConnectionId.
+      GatewayId: !Ref InternetGateway
+      # EgressOnlyInternetGatewayId: String
+      # InstanceId: String
+      # NatGatewayId: String
+      # NetworkInterfaceId: String
+      # VpcPeeringConnectionId: String
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet01RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet01
+  PublicSubnet02RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet02
+  PrivateRouteTable01: # Private01: RouteTables, Route, and Subnet associations
+    Type: AWS::EC2::RouteTable
+    Properties:
+        VpcId: !Ref VPC
+        Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Private Route (AZ1)
+  PrivateSubnet01Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway01
+  PrivateSubnet01RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      SubnetId: !Ref PrivateSubnet01
+  PrivateRouteTable02: # Private02: RouteTables, Route, and Subnet associations
+    Type: AWS::EC2::RouteTable
+    Properties:
+        VpcId: !Ref VPC
+        Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Private Route (AZ2)
+  PrivateSubnet02Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable02
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway02
+  PrivateSubnet02RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable02
+      SubnetId: !Ref PrivateSubnet02
+############
+# Outputs
+############
+Outputs:
+  VPC: # VPC CIDR
+    Description: "VPC CIDR created"
+    Value: !Ref VPC
+    Export:
+      Name: "ANM-Demo-VPC-ID"
+  PublicSubnets: # Subnets
+    Description: "Public Subnets"
+    Value: !Join [", ", [!Ref PublicSubnet01, !Ref PublicSubnet02]]
+  PrivateSubnets:
+    Description: "Private Subnets"
+    Value: !Join [", ", [!Ref PrivateSubnet01, !Ref PrivateSubnet02]]
+  PublicSubnet01Export: # PublicSubnet01 StackExport
+    Value: !Ref PublicSubnet01
+    Description: "Public Subnet AZ1"
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnetAZ1 # Name must be unique for the region
+  PublicSubnet02Export: # PublicSubnet02 StackExport
+    Value: !Ref PublicSubnet02
+    Description: "Public Subnet AZ2"
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnetAZ2

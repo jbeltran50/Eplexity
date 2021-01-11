@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description:
+  Create DLM LifecyclePolicy
+############
+# Input Parameters
+############
+Parameters:
+  EBSNameTag:
+    Type: String
+    Default: "InstanceName"
+############
+#  DLM LifecyclePolicy
+############
+Resources:
+  LifecyclePolicy:
+    Type: "AWS::DLM::LifecyclePolicy"
+    Properties:
+      Description: "Daily EBS Snapshot"
+      State: "ENABLED"
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/AWSDataLifecycleManagerDefaultRole"
+      PolicyDetails:
+        #### PolicyDetails       ####
+        #### Add DLM Tag Example ####
+        ResourceTypes:
+          - "VOLUME"
+        TargetTags:
+          - Key: "DLM-Daily"
+            Value: "Yes"
+        Schedules:
+          - Name: !Sub "DLM-daily-snapshot"
+            TagsToAdd:
+              - Key: "type"
+                Value: "DailySnapshot"
+            CreateRule:
+              Interval: 24
+              IntervalUnit: "HOURS"
+              Times:
+                - "07:00"
+            RetainRule:
+              Count: 3
+            CopyTags: true
+        #### PolicyDetails    ####
+        #### Name Tag Example ####
+        # ResourceTypes:
+        #   - "VOLUME"
+        # TargetTags:
+        #   - Key: "Name"
+        #     Value: !Ref EBSNameTag
+        # Schedules:
+        #   - Name: !Sub "${EBSNameTag}-daily-snapshot"
+        #     TagsToAdd:
+        #       - Key: "type"
+        #         Value: "DailySnapshot"
+        #     CreateRule:
+        #       Interval: 24
+        #       IntervalUnit: "HOURS"
+        #       Times:
+        #         - "07:00"
+        #     RetainRule:
+        #       Count: 3
+        #     CopyTags: true
